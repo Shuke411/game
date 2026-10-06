@@ -1,0 +1,325 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>2048 触屏完整版</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: Arial, sans-serif;
+        }
+        body {
+            background-color: #faf8ef;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding-top: 20px;
+        }
+        .container {
+            width: 90%;
+            max-width: 420px;
+        }
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 15px;
+            gap:10px;
+        }
+        h1 {
+            font-size: 48px;
+            color: #776e65;
+        }
+        .progress-box {
+            background: #bbada0;
+            padding: 8px 12px;
+            border-radius: 6px;
+            color: white;
+            text-align: center;
+        }
+        #restart {
+            background: #8f7a66;
+            border: none;
+            color: white;
+            padding: 10px 18px;
+            border-radius: 6px;
+            font-size: 16px;
+            cursor: pointer;
+            margin-top: 10px;
+        }
+        .grid {
+            background-color: #bbada0;
+            padding: 12px;
+            border-radius: 10px;
+            position: relative;
+            touch-action: none;
+        }
+        .grid-row {
+            display: flex;
+        }
+        .cell {
+            width: 90px;
+            height: 90px;
+            background: #cdc1b4;
+            border-radius: 6px;
+            margin: 6px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 32px;
+            font-weight: bold;
+            color: #776e65;
+        }
+        .game-tip {
+            margin-top:12px;
+            color:#776e65;
+            text-align:center;
+        }
+        /* GameOver弹窗样式 */
+        .gameover-popup{
+            position:absolute;
+            top:0;left:0;right:0;bottom:0;
+            background:rgba(0,0,0,0.6);
+            border-radius:10px;
+            display:none;
+            align-items:center;
+            justify-content:center;
+            z-index:99;
+        }
+        .gameover-text{
+            font-size:42px;
+            color:white;
+            font-weight:bold;
+        }
+    </style>
+</head>
+<body>
+<div class="container">
+    <div class="header">
+        <h1>2048</h1>
+        <div class="progress-box">
+            <div>当前最高</div>
+            <div id="currentMax">0</div>
+        </div>
+        <div class="progress-box">
+            <div>历史最高</div>
+            <div id="bestMax">0</div>
+        </div>
+    </div>
+    <button id="restart">重新开始</button>
+    <div class="grid" id="grid">
+        <div class="gameover-popup" id="gameOverPopup">
+            <div class="gameover-text">Game Over</div>
+        </div>
+    </div>
+    <div class="game-tip">棋盘滑动：上滑方块上移，下滑方块下移，左滑左移，右滑右移</div>
+</div>
+
+<script>
+    const gridEl = document.getElementById('grid');
+    const currentMaxEl = document.getElementById('currentMax');
+    const bestMaxEl = document.getElementById('bestMax');
+    const restartBtn = document.getElementById('restart');
+    const gameOverPopup = document.getElementById('gameOverPopup');
+
+    let board = [];
+    let currentMax = 0;
+    let bestMax = 0;
+    const size = 4;
+
+    let startX = 0;
+    let startY = 0;
+    let endX = 0;
+    let endY = 0;
+
+    function loadBest() {
+        const saved = localStorage.getItem('best2048');
+        if(saved) bestMax = parseInt(saved);
+        bestMaxEl.textContent = bestMax;
+    }
+    function saveBest() {
+        localStorage.setItem('best2048', bestMax.toString());
+    }
+
+    function initBoard() {
+        board = Array(size).fill().map(() => Array(size).fill(0));
+        currentMax = 0;
+        currentMaxEl.textContent = currentMax;
+        addRandom();
+        updateCurrentMax();
+        render();
+    }
+
+    function addRandom() {
+        let empty = [];
+        for(let i=0;i<size;i++){
+            for(let j=0;j<size;j++){
+                if(board[i][j]===0) empty.push({x:i,y:j});
+            }
+        }
+        if(empty.length ===0) return;
+        let pos = empty[Math.floor(Math.random()*empty.length)];
+        board[pos.x][pos.y] = Math.random()>0.1 ? 2 :4;
+    }
+
+    function updateCurrentMax() {
+        let maxVal = 0;
+        for(let i=0;i<size;i++){
+            for(let j=0;j<size;j++){
+                if(board[i][j]>maxVal) maxVal = board[i][j];
+            }
+        }
+        currentMax = maxVal;
+        currentMaxEl.textContent = currentMax;
+        if(currentMax > bestMax){
+            bestMax = currentMax;
+            bestMaxEl.textContent = bestMax;
+            saveBest();
+        }
+        if(currentMax === 2048){
+            alert("🎉恭喜！合成2048，游戏胜利！");
+        }
+    }
+
+    function render() {
+        gridEl.innerHTML = '';
+        gameOverPopup.style.display = "none";
+        gridEl.appendChild(gameOverPopup);
+        for(let i=0;i<size;i++){
+            const rowDiv = document.createElement('div');
+            rowDiv.className = 'grid-row';
+            for(let j=0;j<size;j++){
+                const cell = document.createElement('div');
+                cell.className = 'cell';
+                let val = board[i][j];
+                if(val!==0){
+                    cell.textContent = val;
+                    if(val===2) cell.style.background='#eee4da';
+                    else if(val===4) cell.style.background='#ede0c8';
+                    else if(val===8) {cell.style.background='#f2b179';cell.style.color='#fff';}
+                    else if(val===16) {cell.style.background='#f59563';cell.style.color='#fff';}
+                    else if(val===32) {cell.style.background='#f67c5f';cell.style.color='#fff';}
+                    else if(val===64) {cell.style.background='#f65e3b';cell.style.color='#fff';}
+                    else if(val===128) {cell.style.background='#edcf72';cell.style.color='#fff';}
+                    else if(val===256) {cell.style.background='#edcc61';cell.style.color='#fff';}
+                    else if(val===512) {cell.style.background='#edc850';cell.style.color='#fff';}
+                    else if(val===1024) {cell.style.background='#edc53f';cell.style.color='#fff';}
+                    else if(val===2048) {cell.style.background='#edc22e';cell.style.color='#fff';}
+                    else {cell.style.background='#3c3a32';cell.style.color='#fff';}
+                }
+                rowDiv.appendChild(cell);
+            }
+            gridEl.appendChild(rowDiv);
+        }
+    }
+
+    function moveLeft() {
+        let moved = false;
+        for(let i=0;i<size;i++){
+            let row = board[i].filter(v=>v!==0);
+            for(let j=0;j<row.length-1;j++){
+                if(row[j]===row[j+1]){
+                    row[j] *=2;
+                    row.splice(j+1,1);
+                }
+            }
+            let newRow = Array(size).fill(0);
+            row.forEach((v,idx)=>newRow[idx]=v);
+            if(JSON.stringify(board[i])!==JSON.stringify(newRow)) moved=true;
+            board[i] = newRow;
+        }
+        return moved;
+    }
+    function rotate(mat) {
+        let res = Array(size).fill().map(()=>Array(size).fill(0));
+        for(let i=0;i<size;i++){
+            for(let j=0;j<size;j++){
+                res[j][size-1-i] = mat[i][j];
+            }
+        }
+        return res;
+    }
+
+    function isGameDead() {
+        for(let i=0;i<size;i++){
+            for(let j=0;j<size;j++){
+                if(board[i][j]===0) return false;
+            }
+        }
+        for(let i=0;i<size;i++){
+            for(let j=0;j<size;j++){
+                if(j+1<size && board[i][j]===board[i][j+1]) return false;
+                if(i+1<size && board[i][j]===board[i+1][j]) return false;
+            }
+        }
+        return true;
+    }
+
+    function move(dir) {
+        let moved = false;
+        if(dir === 'left') moved = moveLeft();
+        else if(dir === 'right'){
+            board = rotate(rotate(board));
+            moved = moveLeft();
+            board = rotate(rotate(board));
+        }else if(dir === 'up'){
+            board = rotate(rotate(rotate(board)));
+            moved = moveLeft();
+            board = rotate(board);
+        }else if(dir === 'down'){
+            board = rotate(board);
+            moved = moveLeft();
+            board = rotate(rotate(rotate(board)));
+        }
+
+        if(moved){
+            addRandom();
+            updateCurrentMax();
+            render();
+        }else{
+            if(isGameDead()){
+                // 显示Game Over遮罩弹窗，停留1秒后自动新开一局
+                gameOverPopup.style.display = "flex";
+                setTimeout(()=>{
+                    initBoard();
+                },1000);
+            }
+        }
+    }
+
+    gridEl.addEventListener('touchstart', function(e){
+        startX = e.touches[0].clientX;
+        startY = e.touches[0].clientY;
+    });
+
+    gridEl.addEventListener('touchend', function(e){
+        endX = e.changedTouches[0].clientX;
+        endY = e.changedTouches[0].clientY;
+        const dx = endX - startX;
+        const dy = endY - startY;
+        const minDistance = 30;
+
+        if(Math.abs(dx) > Math.abs(dy)){
+            if(dx > minDistance){
+                move('right');
+            }else if(dx < -minDistance){
+                move('left');
+            }
+        }else{
+            if(dy < -minDistance){
+                move('up');
+            }else if(dy > minDistance){
+                move('down');
+            }
+        }
+    });
+
+    restartBtn.onclick = initBoard;
+    loadBest();
+    initBoard();
+</script>
+</body>
+</html>
